@@ -112,7 +112,7 @@ class ATCProxyHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_header("Retry-After", "5")
                 self.send_header("Content-Type", "text/plain")
                 self.end_headers()
-                self.wfile.write(b"Rate limited by LiveATC — wait a few seconds and try again")
+                self.wfile.write(b"Rate limited by LiveATC - wait a few seconds and try again")
                 return
         except Exception as e:
             print(f"  [proxy] {mount} failed: {e}")
@@ -140,8 +140,7 @@ def main():
 
     def shutdown(sig, frame):
         print("\nShutting down...")
-        server.shutdown()
-        sys.exit(0)
+        os._exit(0)
 
     signal.signal(signal.SIGINT, shutdown)
     signal.signal(signal.SIGTERM, shutdown)
