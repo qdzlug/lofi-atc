@@ -1,0 +1,3 @@
+# No external dependencies — stdlib only.
+# This file exists so `make setup` has something to install from
+# if you add deps later.
