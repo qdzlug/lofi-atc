@@ -2,8 +2,6 @@
 
 Lofi beats mixed with live air traffic control radio. A single-page web app backed by a tiny Python proxy server that streams audio from [LiveATC.net](https://www.liveatc.net).
 
-![lofi + atc](https://img.shields.io/badge/vibes-immaculate-7c6ff0)
-
 ## Features
 
 - Simultaneous lofi music + live ATC audio streams
@@ -31,6 +29,10 @@ python3 lofi-atc-server.py
 
 LiveATC streams are behind Cloudflare and don't send CORS headers, so browsers block direct connections from a web page. The proxy server fetches streams server-side with the correct `Referer` and `User-Agent` headers, and includes rate limiting to avoid getting 429'd.
 
+## Troubleshooting
+
+If you get "unavailable" for a stream, check the proxy output. The most common cause here is being rate limited; LiveATC seems pretty aggressive about enforcing this.
+
 ## Project structure
 
 ```
@@ -44,14 +46,19 @@ lofi-atc/
 
 ## Make targets
 
-| Target | Description |
-|--------|-------------|
+| Target       | Description                  |
+| ------------ | ---------------------------- |
 | `make setup` | Create venv and install deps |
-| `make run` | Start the server |
-| `make clean` | Remove venv |
-| `make help` | Show all targets |
+| `make run`   | Start the server             |
+| `make clean` | Remove venv                  |
+| `make help`  | Show all targets             |
+
+## Enhancements
+
+It should be relatively trivial to add different aiports and lofi streams; be aware that depending on the size of the airport there will be a number of streams to choose from. This will include the tower, approach control, departure control, and a number of runway/area specific channels. You can preview these at LiveATC to find what you want.
 
 ## License
 
 MIT
+
 # lofi-atc
