@@ -1,15 +1,17 @@
 # lofi + atc
 
-Lofi beats mixed with live air traffic control radio. A single-page web app backed by a tiny Python proxy server that streams audio from [LiveATC.net](https://www.liveatc.net).
+Lofi beats mixed with live air traffic control radio. A single-page web app backed by a small Python server that proxies audio from [LiveATC.net](https://www.liveatc.net).
 
 ## Features
 
-- Simultaneous lofi music + live ATC audio streams
-- Independent volume controls and mute toggles for each channel
-- Five major US airports: **SFO**, **JFK**, **ORD**, **DEN**, **EWR**
-- Multiple feeds per airport (tower, ground, approach, departure)
-- Keyboard shortcuts: `Space` play/pause, `M` mute, `↑↓` volume
-- Zero external dependencies — Python 3.9+ stdlib only
+- Lofi music and live ATC audio playing at the same time
+- Separate volume and mute controls for each channel
+- Built-in airports: **SFO**, **JFK**, **ORD**, **DEN**, **EWR**
+- **Any LiveATC airport or feed:** press **+** and enter an airport code (`KBOS`, `EGLL`), a feed name (`kbos_twr`), or paste a LiveATC link
+- Automatic reconnect with backoff when a stream drops or LiveATC rate-limits you
+- Remembers your airports, selected feed and volumes
+- Keyboard shortcuts: `Space` play/pause, `M` mute/unmute all, `↑↓` lofi volume
+- No runtime dependencies: Python 3.9+ standard library only
 
 ## Quick start
 
@@ -17,48 +19,111 @@ Lofi beats mixed with live air traffic control radio. A single-page web app back
 make run
 ```
 
-This creates a venv, installs deps, starts the server, and opens `http://localhost:7331` in your browser.
-
-## Manual start
+This starts the server on http://localhost:7331 and opens your browser. You can also run it without `make`:
 
 ```
-python3 lofi-atc-server.py
+python3 -m lofi_atc            # or: python3 lofi-atc-server.py
 ```
+
+Or install it as a command:
+
+```
+pip install .
+lofi-atc --open
+```
+
+### Options
+
+```
+lofi-atc [--host HOST] [--port PORT] [--open] [--stations PATH]
+         [--min-gap SECONDS] [--max-streams N] [--log-level LEVEL]
+```
+
+| Option          | Default       | Description                                                               |
+| --------------- | ------------- | ------------------------------------------------------------------------- |
+| `--host`        | `127.0.0.1`   | Interface to bind. Use `0.0.0.0` to reach it from other devices. Env: `LOFI_ATC_HOST` |
+| `--port`        | `7331`        | Port. Env: `LOFI_ATC_PORT`                                                |
+| `--open`        | off           | Open the UI in your browser on startup                                    |
+| `--stations`    | bundled       | Use your own stations JSON (see below)                                    |
+| `--min-gap`     | `1.5`         | Minimum seconds between requests to LiveATC                               |
+| `--max-streams` | `4`           | Maximum ATC streams proxied at once                                       |
+| `--log-level`   | `INFO`        | `DEBUG` also logs every HTTP request                                      |
+
+## Adding airports and feeds
+
+**From the UI:** press **+** next to the airport buttons and enter one of the following.
+
+- An **airport code** such as `KBOS`. The server looks the airport up on LiveATC's search page and adds every feed it finds. Feeds LiveATC reports as down are marked.
+- A **feed (mount) name** such as `kbos_twr`. This is the `mount=` part of a LiveATC listen link.
+- A **LiveATC link** to a feed, its `.pls` playlist, or a search page.
+
+Airports you add are saved in your browser. Select one and press **remove** to delete it.
+
+**Built-in defaults:** edit `lofi_atc/stations.json`, or point `--stations` at your own copy. The server checks the file on startup and reports problems such as duplicate feeds, invalid mount names, or missing labels.
 
 ## Why a proxy server?
 
-LiveATC streams are behind Cloudflare and don't send CORS headers, so browsers block direct connections from a web page. The proxy server fetches streams server-side with the correct `Referer` and `User-Agent` headers, and includes rate limiting to avoid getting 429'd.
+LiveATC streams sit behind Cloudflare and expect a browser-like `Referer` and `User-Agent`, and the airport search has no API. The server fetches both on the page's behalf. It also protects you from LiveATC's rate limits:
+
+- It spaces requests at least `--min-gap` seconds apart.
+- After LiveATC answers `429 Too Many Requests`, it stops sending requests for the `Retry-After` period. During that cooldown it answers `429` itself instead of making things worse.
+- It caps concurrent streams with `--max-streams`.
+- It caches airport lookups for 15 minutes.
 
 ## Troubleshooting
 
-If you get "unavailable" for a stream, check the proxy output. The most common cause here is being rate limited; LiveATC seems pretty aggressive about enforcing this.
+- **ATC shows "retry Ns":** the feed isn't producing audio. Check the server output:
+  - `HTTP 429` means LiveATC is rate limiting you. The app backs off and retries automatically.
+  - `HTTP 404` / "feed offline" means that feed is down. Pick another one from the dropdown.
+  - "unreachable" means the server can't reach LiveATC. Check your network.
+- **Airport lookup finds nothing:** LiveATC may not cover that airport. You can still paste a feed name or link directly.
+- **Health check:** `curl localhost:7331/healthz` shows the version and the number of open streams.
+
+## Development
+
+```
+make setup     # .venv with pytest + ruff
+make check     # lint + all tests (what CI runs)
+make test-py   # Python tests (pytest)
+make test-js   # frontend unit tests (node --test, Node 20+, no npm install)
+make fmt       # auto-format
+```
+
+The Python tests run the real server on an ephemeral port against a fake LiveATC. They cover proxying, rate-limit cooldowns, stream limits, lookups, static file serving, and clean shutdown on SIGINT and SIGTERM. Frontend logic that needs testing lives in `player.js` with no DOM dependencies, and is tested with fake audio elements and timers.
 
 ## Project structure
 
 ```
 lofi-atc/
-├── lofi-atc.html         # the UI — vanilla HTML/CSS/JS
-├── lofi-atc-server.py    # proxy server (stdlib only)
-├── Makefile              # make setup / make run / make clean
-├── requirements.txt      # empty for now (stdlib only)
-└── README.md
+├── lofi_atc/
+│   ├── cli.py            # argument parsing, startup, shutdown
+│   ├── server.py         # HTTP routes: UI, /api/*, /atc/<mount> proxy
+│   ├── liveatc.py        # airport → feeds lookup (search page parser + cache)
+│   ├── ratelimit.py      # request spacing + 429 cooldown
+│   ├── upstream.py       # outbound requests to LiveATC
+│   ├── config.py         # stations.json loading and validation
+│   ├── stations.json     # built-in airports and lofi streams
+│   └── static/
+│       ├── index.html
+│       ├── style.css
+│       ├── app.js        # DOM wiring
+│       └── player.js     # playback/reconnect logic and input parsing (unit tested)
+├── tests/                # pytest + tests/js (node --test)
+├── lofi-atc-server.py    # compatibility shim for the old entry point
+├── pyproject.toml
+└── Makefile
 ```
 
-## Make targets
+### HTTP endpoints
 
-| Target       | Description                  |
-| ------------ | ---------------------------- |
-| `make setup` | Create venv and install deps |
-| `make run`   | Start the server             |
-| `make clean` | Remove venv                  |
-| `make help`  | Show all targets             |
-
-## Enhancements
-
-It should be relatively trivial to add different aiports and lofi streams; be aware that depending on the size of the airport there will be a number of streams to choose from. This will include the tower, approach control, departure control, and a number of runway/area specific channels. You can preview these at LiveATC to find what you want.
+| Path                     | Description                                         |
+| ------------------------ | --------------------------------------------------- |
+| `/`                      | The UI                                              |
+| `/api/stations`          | Built-in airports and lofi streams (JSON)           |
+| `/api/search?icao=KBOS`  | Feeds LiveATC lists for an airport (JSON)           |
+| `/atc/<mount>`           | Proxied LiveATC audio stream                        |
+| `/healthz`               | Health/status (JSON)                                |
 
 ## License
 
 MIT
-
-# lofi-atc

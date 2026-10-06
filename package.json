@@ -1,0 +1,9 @@
+{
+  "name": "lofi-atc",
+  "private": true,
+  "type": "module",
+  "description": "Frontend tests only; the app itself has no npm dependencies.",
+  "scripts": {
+    "test": "node --test \"tests/js/**/*.test.js\""
+  }
+}

@@ -18,3 +18,8 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+
+# Tooling
+.pytest_cache/
+.ruff_cache/
+node_modules/

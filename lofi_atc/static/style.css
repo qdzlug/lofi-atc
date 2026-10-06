@@ -1,0 +1,372 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Inter:wght@300;400;500;600&display=swap');
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg: #0a0a0f;
+  --surface: #12121a;
+  --surface2: #1a1a26;
+  --border: #2a2a3a;
+  --text: #e0e0e8;
+  --text-dim: #6a6a80;
+  --accent: #7c6ff0;
+  --accent-glow: #7c6ff040;
+  --green: #4ade80;
+  --green-dim: #4ade8040;
+  --amber: #fbbf24;
+  --amber-dim: #fbbf2440;
+  --red: #f87171;
+}
+
+body {
+  font-family: 'Inter', -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow-x: hidden;
+  padding: 24px 0;
+}
+
+/* Ambient background */
+.ambient {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+}
+.ambient::before {
+  content: '';
+  position: absolute;
+  width: 600px; height: 600px;
+  background: radial-gradient(circle, var(--accent-glow), transparent 70%);
+  top: -200px; left: -100px;
+  animation: drift1 20s ease-in-out infinite;
+}
+.ambient::after {
+  content: '';
+  position: absolute;
+  width: 500px; height: 500px;
+  background: radial-gradient(circle, var(--green-dim), transparent 70%);
+  bottom: -200px; right: -100px;
+  animation: drift2 25s ease-in-out infinite;
+}
+@keyframes drift1 {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(100px, 80px); }
+}
+@keyframes drift2 {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(-80px, -60px); }
+}
+
+.app {
+  position: relative;
+  z-index: 1;
+  width: 480px;
+  max-width: 95vw;
+}
+
+/* Header */
+.header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+.header h1 {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 28px;
+  font-weight: 300;
+  letter-spacing: 6px;
+  text-transform: lowercase;
+  margin-bottom: 6px;
+}
+.header h1 span { color: var(--text-dim); }
+.header p {
+  font-size: 12px;
+  color: var(--text-dim);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+/* Card */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 28px;
+  margin-bottom: 16px;
+  backdrop-filter: blur(20px);
+  transition: border-color 0.3s;
+}
+.card:hover { border-color: #3a3a50; }
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+.card-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+/* Status indicator */
+.status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.status-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  transition: background 0.3s;
+}
+.status.live .status-dot {
+  background: var(--green);
+  box-shadow: 0 0 8px var(--green-dim);
+  animation: pulse 2s ease-in-out infinite;
+}
+.status.live { color: var(--green); }
+.status.loading .status-dot { background: var(--amber); }
+.status.loading { color: var(--amber); }
+.status.error .status-dot { background: var(--red); }
+.status.error { color: var(--red); }
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* Volume slider */
+.volume-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.vol-icon {
+  width: 20px;
+  height: 20px;
+  color: var(--text-dim);
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+.vol-icon:hover { color: var(--text); }
+.vol-icon.muted { color: var(--red); }
+
+.slider-wrap {
+  flex: 1;
+  position: relative;
+  height: 32px;
+  display: flex;
+  align-items: center;
+}
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  background: var(--surface2);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: var(--text);
+  border: none;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+  box-shadow: 0 0 12px rgba(255,255,255,0.2);
+}
+.vol-pct {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--text-dim);
+  width: 36px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* Airport selector */
+.airport-selector {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.airport-btn {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 1px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.airport-btn:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+.airport-btn.active {
+  border-color: var(--accent);
+  background: var(--accent-glow);
+  color: var(--text);
+}
+
+.feed-info {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: 0.5px;
+}
+
+/* Master play button */
+.master-controls {
+  display: flex;
+  justify-content: center;
+  margin-top: 8px;
+}
+.play-btn {
+  width: 64px; height: 64px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s;
+}
+.play-btn:hover {
+  border-color: var(--accent);
+  box-shadow: 0 0 24px var(--accent-glow);
+  transform: scale(1.05);
+}
+.play-btn.playing {
+  border-color: var(--accent);
+  background: var(--accent-glow);
+}
+.play-btn svg { width: 24px; height: 24px; }
+
+/* Visualizer */
+.visualizer {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 3px;
+  height: 24px;
+  margin-top: 20px;
+  opacity: 0;
+  transition: opacity 0.5s;
+}
+.visualizer.active { opacity: 1; }
+.visualizer .bar {
+  width: 3px;
+  background: var(--accent);
+  border-radius: 2px;
+  opacity: 0.6;
+  animation: none;
+}
+.visualizer.active .bar { animation: viz 1.2s ease-in-out infinite; }
+@keyframes viz {
+  0%, 100% { height: 4px; }
+  50% { height: 20px; }
+}
+
+/* Footer hint */
+.hint {
+  text-align: center;
+  margin-top: 24px;
+  font-size: 11px;
+  color: var(--text-dim);
+  letter-spacing: 1px;
+}
+.hint a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+/* Crossfade slider */
+.crossfade-section {
+  margin-top: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.crossfade-label {
+  display: flex;
+  justify-content: space-between;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+}
+
+/* Icon buttons (mute toggles) */
+.icon-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  display: flex;
+  border-radius: 4px;
+}
+.icon-btn svg { width: 100%; height: 100%; }
+.icon-btn:focus-visible, .airport-btn:focus-visible, .play-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* User-added airports get a small remove control */
+.airport-btn .remove {
+  margin-left: 8px;
+  color: var(--text-dim);
+}
+.airport-btn .remove:hover { color: var(--red); }
+.airport-btn.add { border-style: dashed; }
+
+/* Feed picker + add-airport form */
+.feed-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.feed-row select, .add-form input {
+  flex: 1;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text);
+  min-width: 0;
+}
+.add-form {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.add-form[hidden] { display: none; }
+.feed-info.error { color: var(--red); }

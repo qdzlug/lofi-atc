@@ -1,0 +1,64 @@
+{
+  "lofi": [
+    "https://stream.zeno.fm/0r0xa792kwzuv",
+    "https://stream.zeno.fm/f3wvbbqmdg8uv",
+    "https://streams.ilovemusic.de/iloveradio17.mp3"
+  ],
+  "airports": [
+    {
+      "icao": "KSFO",
+      "label": "SFO",
+      "name": "San Francisco Intl",
+      "feeds": [
+        { "mount": "ksfo_twr", "label": "Tower" },
+        { "mount": "ksfo_gnd_twr", "label": "Ground/Tower" },
+        { "mount": "ksfo_app2_l", "label": "NorCal Approach" }
+      ]
+    },
+    {
+      "icao": "KJFK",
+      "label": "JFK",
+      "name": "John F. Kennedy Intl",
+      "feeds": [
+        { "mount": "kjfk9_s", "label": "Ground/Tower" },
+        { "mount": "kjfk_app_final", "label": "Approach/Final" }
+      ]
+    },
+    {
+      "icao": "KORD",
+      "label": "ORD",
+      "name": "O'Hare Intl",
+      "feeds": [
+        { "mount": "kord7", "label": "Tower" },
+        { "mount": "kord4", "label": "Tower North" },
+        { "mount": "kord2", "label": "Tower Center" },
+        { "mount": "kord1", "label": "Ground" },
+        { "mount": "kord5", "label": "Approach SE" },
+        { "mount": "kord1n1_app_133625", "label": "Approach 10R/28C" }
+      ]
+    },
+    {
+      "icao": "KDEN",
+      "label": "DEN",
+      "name": "Denver Intl",
+      "feeds": [
+        { "mount": "kden1_3", "label": "Tower" },
+        { "mount": "kden1_1", "label": "Approach" },
+        { "mount": "kden1_2", "label": "Departure" },
+        { "mount": "kden1_5", "label": "Denver Center Low" },
+        { "mount": "kden1_7", "label": "Denver Center High" },
+        { "mount": "kden1_app_134850", "label": "Approach Class B North" }
+      ]
+    },
+    {
+      "icao": "KEWR",
+      "label": "EWR",
+      "name": "Newark Liberty Intl",
+      "feeds": [
+        { "mount": "kewr_twr", "label": "Tower" },
+        { "mount": "kewr_gnd_pri", "label": "Ground" },
+        { "mount": "kewr_app_n", "label": "Approach North" }
+      ]
+    }
+  ]
+}
