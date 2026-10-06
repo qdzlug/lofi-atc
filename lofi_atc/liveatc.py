@@ -32,6 +32,10 @@ class SearchError(Exception):
     """LiveATC could not be reached or answered with an error."""
 
 
+class BrowserCheckRequired(SearchError):
+    """LiveATC's CDN wants a JavaScript challenge solved, which only a real browser can do."""
+
+
 def _clean(fragment: str) -> str:
     return " ".join(html.unescape(_TAG_RE.sub(" ", fragment)).split())
 
@@ -105,6 +109,8 @@ class FeedDirectory:
                 retry = parse_retry_after(e.headers.get("Retry-After"), self.default_retry_after)
                 self.limiter.penalize(retry)
                 raise RateLimited(retry) from e
+            if e.headers.get("cf-mitigated") == "challenge":
+                raise BrowserCheckRequired("LiveATC's search page requires a browser check") from e
             raise SearchError(f"LiveATC returned HTTP {e.code}") from e
         except OSError as e:  # URLError, timeouts, connection resets
             raise SearchError(f"LiveATC unreachable: {e}") from e

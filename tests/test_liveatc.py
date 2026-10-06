@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from lofi_atc.liveatc import FeedDirectory, SearchError, parse_search_results
+from lofi_atc.liveatc import BrowserCheckRequired, FeedDirectory, SearchError, parse_search_results
 from lofi_atc.ratelimit import RateLimited, RateLimiter
 
 FIXTURE = (Path(__file__).parent / "fixtures" / "liveatc_search_kbos.html").read_text()
@@ -29,10 +29,12 @@ def test_no_results():
     assert parse_search_results("<html>No results found</html>") == []
 
 
-def http_error(code, retry_after=None):
+def http_error(code, retry_after=None, **extra_headers):
     headers = Message()
     if retry_after:
         headers["Retry-After"] = retry_after
+    for k, v in extra_headers.items():
+        headers[k.replace("_", "-")] = v
     return urllib.error.HTTPError("http://x", code, "err", headers, io.BytesIO())
 
 
@@ -80,4 +82,12 @@ def test_search_errors(error):
         raise error
 
     with pytest.raises(SearchError):
+        FeedDirectory(RateLimiter(0), fetch=fetch).search("KBOS")
+
+
+def test_search_detects_cloudflare_challenge():
+    def fetch(url, timeout):
+        raise http_error(403, cf_mitigated="challenge")
+
+    with pytest.raises(BrowserCheckRequired):
         FeedDirectory(RateLimiter(0), fetch=fetch).search("KBOS")

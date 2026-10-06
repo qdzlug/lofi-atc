@@ -2,8 +2,9 @@
 import {
   Channel,
   addCustomFeeds,
-  atcUrl,
+  atcSources,
   mergeAirports,
+  mountFromAtcUrl,
   nextMuteAll,
   parseFeedInput,
   shortcutFor,
@@ -77,9 +78,23 @@ function showStatus(el, state, detail, liveText) {
   el.querySelector('span').textContent = text;
 }
 
-function setInfo(text, isError = false) {
+function setInfo(text, isError = false, link = null) {
   els.feedInfo.textContent = text;
+  if (link) {
+    const a = document.createElement('a');
+    a.href = link.href;
+    a.textContent = link.text;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    els.feedInfo.append(' ', a);
+  }
   els.feedInfo.classList.toggle('error', isError);
+}
+
+// Lookups can fail (LiveATC sometimes puts its search page behind a browser
+// check). The user's own browser can always open it, so offer that instead.
+function liveatcSearchLink(icao) {
+  return { href: `https://www.liveatc.net/search/?icao=${encodeURIComponent(icao)}`, text: `find ${icao} feeds on LiveATC ↗` };
 }
 
 function currentAirport() {
@@ -95,23 +110,42 @@ function showFeedInfo(state, detail) {
   const feed = currentFeed();
   if (!ap || !feed) return;
   const base = `${ap.icao} · ${feed.label}`;
-  if (state === 'connecting') setInfo(`${base} · connecting…`);
+  if (state === 'connecting') setInfo(`${base} · tuning in (ATC can take ~20s to start)…`);
   else if (state === 'retrying') {
     const s = Math.round(detail.delayMs / 1000);
-    setInfo(`${base} · no audio, retrying in ${s}s (or pick another feed)`, true);
+    setInfo(`${ap.icao} · no feeds are online right now, retrying in ${s}s`, true);
   } else setInfo(base);
 }
 
 // ── Channels ──
 const lofi = new Channel({
+  connectTimeoutMs: 15000,
   onStatus: (s, d) => showStatus(els.lofiStatus, s, d, 'streaming'),
 });
 const atc = new Channel({
+  // ATC feeds are low bitrate, so the browser needs ~15-20s of audio before it
+  // will start playing. A shorter timeout gives up on perfectly good feeds.
+  connectTimeoutMs: 45000,
   onStatus: (s, d) => {
     showStatus(els.atcStatus, s, d, 'live');
+    const live = s === 'live' ? mountFromAtcUrl(d.url) : null;
+    if (live && live !== selected.mount) {
+      // The chosen feed was offline and a fallback feed is playing: say so.
+      const wanted = currentFeed()?.label ?? selected.mount;
+      selected = { ...selected, mount: live };
+      store.set('selected', selected);
+      updateSelection();
+      setInfo(`${selected.icao} · ${currentFeed()?.label ?? live} (${wanted} is offline)`);
+      return;
+    }
     showFeedInfo(s, d);
   },
 });
+
+function startAtc() {
+  const ap = currentAirport();
+  if (ap) atc.start(atcSources(ap.feeds, selected.mount));
+}
 
 // ── Airports & feeds ──
 function shortLabel(icao) {
@@ -168,7 +202,7 @@ function selectAirport(icao, mount) {
   selected = { icao: ap.icao, mount: feed.mount };
   store.set('selected', selected);
   updateSelection();
-  if (isPlaying) atc.start([atcUrl(feed.mount)]);
+  if (isPlaying) startAtc();
 }
 
 function saveCustom(next) {
@@ -213,11 +247,12 @@ async function lookUpAirport(icao) {
       return;
     }
     if (!res.ok) {
-      setInfo(`lookup failed: ${body.error ?? res.statusText}`, true);
+      const why = body.browser_check ? 'LiveATC wants a browser check' : `lookup failed (${body.error ?? res.statusText})`;
+      setInfo(`${why}; copy a feed link from there and paste it here:`, true, liveatcSearchLink(icao));
       return;
     }
     if (!body.feeds?.length) {
-      setInfo(`no LiveATC feeds found for ${icao}; paste a feed name or LiveATC link instead`, true);
+      setInfo(`no feeds found for ${icao}; check LiveATC and paste a feed link here:`, true, liveatcSearchLink(icao));
       return;
     }
     addAirport({ icao, label: shortLabel(icao), name: icao, feeds: body.feeds });
@@ -266,8 +301,7 @@ function togglePlay() {
   isPlaying = true;
   setPlayingUi(true);
   lofi.start(lofiSources);
-  const feed = currentFeed();
-  if (feed) atc.start([atcUrl(feed.mount)]);
+  startAtc();
 }
 
 els.playBtn.addEventListener('click', togglePlay);

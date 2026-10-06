@@ -8,6 +8,21 @@ export function atcUrl(mount) {
   return `/atc/${encodeURIComponent(mount)}`;
 }
 
+export function mountFromAtcUrl(url) {
+  const m = /\/atc\/([^/?#]+)$/.exec(url ?? '');
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
+/**
+ * Proxy URLs to try for an airport: the chosen feed first, then the airport's
+ * other feeds as fallbacks, since individual LiveATC feeds go offline often.
+ */
+export function atcSources(feeds, mount) {
+  const chosen = feeds.filter((f) => f.mount === mount);
+  const rest = feeds.filter((f) => f.mount !== mount);
+  return [...chosen, ...rest].map((f) => atcUrl(f.mount));
+}
+
 // Exponential backoff for reconnects: 2s, 4s, 8s ... capped at `max`.
 export function backoffDelay(attempt, base = 2000, max = 60000) {
   return Math.min(max, base * 2 ** Math.max(0, attempt));

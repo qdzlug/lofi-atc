@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from tests.conftest import STREAM_BODY, Client, FakeLiveATC, wait_for
+from tests.test_liveatc import http_error
 
 FIXTURE = (Path(__file__).parent / "fixtures" / "liveatc_search_kbos.html").read_text()
 
@@ -184,6 +185,13 @@ def test_search_upstream_failure(client, search):
     assert "unreachable" in json.loads(body)["error"]
 
 
+def test_search_reports_browser_check(client, search):
+    search.error = http_error(403, cf_mitigated="challenge")
+    status, _, body = client.request("/api/search?icao=KBOS")
+    assert status == 502
+    assert json.loads(body)["browser_check"] is True
+
+
 def test_search_shares_cooldown_with_streams(client, search):
     client.request("/atc/ratelimited")
     search.pages["KBOS"] = FIXTURE
@@ -191,3 +199,20 @@ def test_search_shares_cooldown_with_streams(client, search):
     assert status == 429
     assert "Retry-After" in headers
     assert search.calls == []
+
+
+def test_offline_feeds_are_remembered(client):
+    assert client.request("/atc/gone")[0] == 404
+    assert client.request("/atc/gone")[0] == 404
+    assert FakeLiveATC.hits == ["gone"]
+    status, _, body = client.request("/healthz")
+    assert json.loads(body)["offline_feeds"] == ["gone"]
+
+
+def test_offline_memory_expires(make_app):
+    app = make_app()
+    app.settings = type(app.settings)(upstream_base=app.settings.upstream_base, offline_ttl=0)
+    client = Client(f"http://127.0.0.1:{app.server_address[1]}")
+    client.request("/atc/gone")
+    client.request("/atc/gone")
+    assert FakeLiveATC.hits == ["gone", "gone"]

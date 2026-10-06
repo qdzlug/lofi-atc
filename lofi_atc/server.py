@@ -7,6 +7,7 @@ import json
 import logging
 import math
 import threading
+import time
 import urllib.error
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -15,7 +16,7 @@ from urllib.parse import parse_qs, urlsplit
 
 from . import __version__
 from .config import MOUNT_RE, Stations
-from .liveatc import ICAO_RE, FeedDirectory, SearchError
+from .liveatc import ICAO_RE, BrowserCheckRequired, FeedDirectory, SearchError
 from .ratelimit import RateLimited, RateLimiter
 from .upstream import open_url, parse_retry_after
 
@@ -39,6 +40,9 @@ class ProxySettings:
     max_streams: int = 4
     # Cooldown applied after LiveATC answers 429 without a usable Retry-After.
     default_retry_after: float = 10.0
+    # How long to remember that a feed answered 404, so retries and failover
+    # across an airport's feeds don't spend LiveATC's rate budget on dead feeds.
+    offline_ttl: float = 300.0
 
 
 class LofiATCServer(ThreadingHTTPServer):
@@ -66,6 +70,7 @@ class LofiATCServer(ThreadingHTTPServer):
         self._stream_slots = threading.BoundedSemaphore(settings.max_streams)
         self._active_lock = threading.Lock()
         self.active_streams = 0
+        self._offline: dict[str, float] = {}
         super().__init__(address, RequestHandler)
 
     def try_open_stream_slot(self) -> bool:
@@ -79,6 +84,17 @@ class LofiATCServer(ThreadingHTTPServer):
         with self._active_lock:
             self.active_streams -= 1
         self._stream_slots.release()
+
+    def mark_offline(self, mount: str) -> None:
+        with self._active_lock:
+            self._offline[mount] = time.monotonic() + self.settings.offline_ttl
+
+    def offline_mounts(self) -> list[str]:
+        now = time.monotonic()
+        with self._active_lock:
+            for mount in [m for m, until in self._offline.items() if until <= now]:
+                del self._offline[mount]
+            return sorted(self._offline)
 
 
 class RequestHandler(BaseHTTPRequestHandler):
@@ -106,10 +122,16 @@ class RequestHandler(BaseHTTPRequestHandler):
         elif path == "/api/search":
             self._search(parse_qs(url.query).get("icao", [""])[0], head)
         elif path == "/healthz":
-            body = json.dumps(
-                {"status": "ok", "version": __version__, "active_streams": self.server.active_streams}
-            ).encode()
-            self._send_bytes(200, body, "application/json", head)
+            self._send_json(
+                200,
+                {
+                    "status": "ok",
+                    "version": __version__,
+                    "active_streams": self.server.active_streams,
+                    "offline_feeds": self.server.offline_mounts(),
+                },
+                head,
+            )
         else:
             self._serve_static("index.html" if path == "/" else path.lstrip("/"), head)
 
@@ -163,7 +185,8 @@ class RequestHandler(BaseHTTPRequestHandler):
             return
         except SearchError as e:
             log.warning("search %s failed: %s", icao, e)
-            self._send_json(502, {"error": str(e)}, head)
+            body = {"error": str(e), "browser_check": isinstance(e, BrowserCheckRequired)}
+            self._send_json(502, body, head)
             return
         log.info("search %s: %d feeds", icao, len(feeds))
         self._send_json(200, {"icao": icao, "feeds": feeds}, head)
@@ -185,6 +208,9 @@ class RequestHandler(BaseHTTPRequestHandler):
 
     def _stream_upstream(self, mount: str) -> None:
         settings = self.server.settings
+        if mount in self.server.offline_mounts():
+            self._send_text(404, f"Feed offline: {mount}")
+            return
         try:
             self.server.limiter.acquire()
         except RateLimited as e:
@@ -204,6 +230,7 @@ class RequestHandler(BaseHTTPRequestHandler):
                 self.server.limiter.penalize(retry)
                 self._send_text(429, "Rate limited by LiveATC", {"Retry-After": str(math.ceil(retry))})
             elif e.code == 404:
+                self.server.mark_offline(mount)
                 self._send_text(404, f"Feed offline: {mount}")
             else:
                 self._send_text(502, f"LiveATC returned HTTP {e.code}")
@@ -220,7 +247,9 @@ class RequestHandler(BaseHTTPRequestHandler):
             self.send_header("Cache-Control", "no-cache, no-store")
             self.send_header("X-Content-Type-Options", "nosniff")
             self.end_headers()
-            log.info("%s: streaming", mount)
+            # LiveATC redirects d.liveatc.net to regional relays (s1-bos.liveatc.net, ...);
+            # logging the relay makes firewall/allowlist problems easy to spot.
+            log.info("%s: streaming from %s", mount, urlsplit(resp.url).netloc)
             sent = self._pump(resp, mount)
             log.info("%s: stream ended after %d bytes", mount, sent)
 

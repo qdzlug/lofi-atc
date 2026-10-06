@@ -8,6 +8,7 @@ Lofi beats mixed with live air traffic control radio. A single-page web app back
 - Separate volume and mute controls for each channel
 - Built-in airports: **SFO**, **JFK**, **ORD**, **DEN**, **EWR**
 - **Any LiveATC airport or feed:** press **+** and enter an airport code (`KBOS`, `EGLL`), a feed name (`kbos_twr`), or paste a LiveATC link
+- **Feed failover:** individual LiveATC feeds go offline often, so if the feed you picked is down the app plays the airport's next working feed and tells you which one
 - Automatic reconnect with backoff when a stream drops or LiveATC rate-limits you
 - Remembers your airports, selected feed and volumes
 - Keyboard shortcuts: `Space` play/pause, `M` mute/unmute all, `↑↓` lofi volume
@@ -53,7 +54,7 @@ lofi-atc [--host HOST] [--port PORT] [--open] [--stations PATH]
 
 **From the UI:** press **+** next to the airport buttons and enter one of the following.
 
-- An **airport code** such as `KBOS`. The server looks the airport up on LiveATC's search page and adds every feed it finds. Feeds LiveATC reports as down are marked.
+- An **airport code** such as `KBOS`. The server looks the airport up on LiveATC's search page and adds every feed it finds. Feeds LiveATC reports as down are marked. LiveATC sometimes puts its search page behind a Cloudflare browser check that a server can't pass. When that happens, the app links you to the search page in your own browser so you can copy a feed link from there.
 - A **feed (mount) name** such as `kbos_twr`. This is the `mount=` part of a LiveATC listen link.
 - A **LiveATC link** to a feed, its `.pls` playlist, or a search page.
 
@@ -69,15 +70,18 @@ LiveATC streams sit behind Cloudflare and expect a browser-like `Referer` and `U
 - After LiveATC answers `429 Too Many Requests`, it stops sending requests for the `Retry-After` period. During that cooldown it answers `429` itself instead of making things worse.
 - It caps concurrent streams with `--max-streams`.
 - It caches airport lookups for 15 minutes.
+- It remembers feeds that returned 404 for 5 minutes and answers those requests itself, so failover doesn't spend your rate budget on dead feeds.
 
 ## Troubleshooting
 
-- **ATC shows "retry Ns":** the feed isn't producing audio. Check the server output:
+- **ATC takes a while to start:** that's normal. ATC feeds are low bitrate, so browsers buffer about 15–20 seconds before they start playing.
+- **ATC shows "retry Ns":** none of the airport's feeds are producing audio. Check the server output:
   - `HTTP 429` means LiveATC is rate limiting you. The app backs off and retries automatically.
-  - `HTTP 404` / "feed offline" means that feed is down. Pick another one from the dropdown.
+  - `HTTP 404` / "feed offline" means that feed is down. The app already tried the airport's other feeds, so they're all down. Try another airport.
   - "unreachable" means the server can't reach LiveATC. Check your network.
 - **Airport lookup finds nothing:** LiveATC may not cover that airport. You can still paste a feed name or link directly.
-- **Health check:** `curl localhost:7331/healthz` shows the version and the number of open streams.
+- **Streams fail behind a firewall or allowlist:** `d.liveatc.net` redirects to regional relays such as `s1-bos.liveatc.net`. Allow `*.liveatc.net`. The server log shows which relay each stream came from.
+- **Health check:** `curl localhost:7331/healthz` shows the version, the number of open streams, and the feeds currently known to be offline.
 
 ## Development
 

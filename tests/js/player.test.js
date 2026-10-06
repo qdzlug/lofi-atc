@@ -4,10 +4,12 @@ import { describe, it } from 'node:test';
 import {
   Channel,
   addCustomFeeds,
+  atcSources,
   atcUrl,
   backoffDelay,
   icaoFromMount,
   mergeAirports,
+  mountFromAtcUrl,
   nextMuteAll,
   parseFeedInput,
   shortcutFor,
@@ -208,6 +210,21 @@ describe('backoffDelay', () => {
 
 describe('atcUrl', () => {
   it('builds proxy URLs', () => assert.equal(atcUrl('kbos_twr'), '/atc/kbos_twr'));
+});
+
+describe('atcSources / mountFromAtcUrl', () => {
+  const feeds = [{ mount: 'a' }, { mount: 'b' }, { mount: 'c' }];
+  it('tries the chosen feed first, then the rest in order', () => {
+    assert.deepEqual(atcSources(feeds, 'b'), ['/atc/b', '/atc/a', '/atc/c']);
+  });
+  it('falls back to config order for an unknown feed', () => {
+    assert.deepEqual(atcSources(feeds, 'zzz'), ['/atc/a', '/atc/b', '/atc/c']);
+  });
+  it('round-trips mounts', () => {
+    assert.equal(mountFromAtcUrl(atcUrl('kord1n1_app_133625')), 'kord1n1_app_133625');
+    assert.equal(mountFromAtcUrl('https://stream.zeno.fm/x'), null);
+    assert.equal(mountFromAtcUrl(undefined), null);
+  });
 });
 
 describe('icaoFromMount', () => {

@@ -370,3 +370,4 @@ input[type="range"]::-webkit-slider-thumb:hover {
 }
 .add-form[hidden] { display: none; }
 .feed-info.error { color: var(--red); }
+.feed-info a { color: var(--accent); }
