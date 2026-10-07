@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>lofi + atc</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="ambient"></div>
+
+<div class="app" id="app">
+  <!-- Header -->
+  <div class="header">
+    <h1>lofi <span>+</span> atc</h1>
+    <p>beats & tower chatter</p>
+  </div>
+
+  <!-- Lofi Card -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-label">lofi beats</span>
+      <div class="status" id="lofi-status" role="status">
+        <div class="status-dot"></div>
+        <span>offline</span>
+      </div>
+    </div>
+    <div class="volume-row">
+      <button type="button" class="icon-btn vol-icon" id="lofi-mute" aria-label="Mute lofi" aria-pressed="false"></button>
+      <div class="slider-wrap">
+        <input type="range" id="lofi-vol" min="0" max="100" value="70" aria-label="Lofi volume">
+      </div>
+      <span class="vol-pct" id="lofi-pct">70%</span>
+    </div>
+  </div>
+
+  <!-- ATC Card -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-label">atc radio</span>
+      <div class="status" id="atc-status" role="status">
+        <div class="status-dot"></div>
+        <span>offline</span>
+      </div>
+    </div>
+
+    <div class="airport-selector" id="airport-selector"></div>
+
+    <form class="add-form" id="add-form" hidden>
+      <input id="add-input" autocomplete="off" spellcheck="false"
+             placeholder="KBOS, kbos_twr, or a LiveATC link"
+             aria-label="Airport code, feed name, or LiveATC link">
+      <button type="submit" class="airport-btn" id="add-submit">add</button>
+    </form>
+
+    <div class="feed-row">
+      <select id="feed-select" aria-label="ATC feed"></select>
+      <button type="button" class="airport-btn" id="remove-airport" hidden title="Remove the feeds you added for this airport">remove</button>
+    </div>
+
+    <div class="volume-row">
+      <button type="button" class="icon-btn vol-icon" id="atc-mute" aria-label="Mute ATC" aria-pressed="false"></button>
+      <div class="slider-wrap">
+        <input type="range" id="atc-vol" min="0" max="100" value="30" aria-label="ATC volume">
+      </div>
+      <span class="vol-pct" id="atc-pct">30%</span>
+    </div>
+
+    <div class="feed-info" id="feed-info" aria-live="polite">loading stations…</div>
+  </div>
+
+  <!-- Master Controls -->
+  <div class="master-controls">
+    <button type="button" class="play-btn" id="play-btn" aria-label="Play">
+      <svg viewBox="0 0 24 24" fill="currentColor" id="play-icon">
+        <polygon points="5,3 19,12 5,21"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- Visualizer -->
+  <div class="visualizer" id="visualizer" aria-hidden="true"></div>
+
+  <div class="hint">
+    space play/pause · m mute · ↑↓ lofi volume · ATC audio via <a href="https://www.liveatc.net" target="_blank" rel="noopener">LiveATC.net</a>
+  </div>
+</div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>

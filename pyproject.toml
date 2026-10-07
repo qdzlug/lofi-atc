@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lofi-atc"
+dynamic = ["version"]
+description = "Lofi beats mixed with live air traffic control radio"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.9"
+dependencies = []  # runtime is stdlib-only, keep it that way
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[project.scripts]
+lofi-atc = "lofi_atc.cli:main"
+
+[tool.setuptools]
+packages = ["lofi_atc"]
+
+[tool.setuptools.dynamic]
+version = { attr = "lofi_atc.__version__" }
+
+[tool.setuptools.package-data]
+lofi_atc = ["stations.json", "static/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.ruff]
+line-length = 110
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
