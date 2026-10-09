@@ -5,6 +5,7 @@ Lofi beats mixed with live air traffic control radio. A single-page web app back
 ## Features
 
 - Lofi music and live ATC audio playing at the same time
+- **Ad-free music by default:** listener-supported [SomaFM](https://somafm.com) channels (instrumental hip-hop and downtempo), with a station picker. If a station is unreachable, the next one plays automatically
 - Separate volume and mute controls for each channel
 - Built-in airports: **SFO**, **JFK**, **ORD**, **DEN**, **EWR**
 - **Any LiveATC airport or feed:** press **+** and enter an airport code (`KBOS`, `EGLL`), a feed name (`kbos_twr`), or paste a LiveATC link
@@ -61,6 +62,24 @@ lofi-atc [--host HOST] [--port PORT] [--open] [--stations PATH]
 Airports you add are saved in your browser. Select one and press **remove** to delete it.
 
 **Built-in defaults:** edit `lofi_atc/stations.json`, or point `--stations` at your own copy. The server checks the file on startup and reports problems such as duplicate feeds, invalid mount names, or missing labels.
+
+## Music stations
+
+The lofi card plays the stations listed under `lofi` in `stations.json`. Each entry looks like this:
+
+```json
+{
+  "label": "Fluid · instrumental hip-hop",
+  "url": "https://ice1.somafm.com/fluid-128-mp3",
+  "credit": "SomaFM",
+  "credit_url": "https://somafm.com/fluid/"
+}
+```
+
+- `url` must be a direct audio stream (MP3/AAC) that a browser can play. Plain URL strings are still accepted, as in older config files.
+- `credit` and `credit_url` are optional. When set, the UI links back to the source.
+- The selected station plays first, and the others are fallbacks in list order.
+- The defaults are ad-free SomaFM channels. SomaFM is listener-supported, so consider [donating](https://somafm.com/support/) if you use it a lot.
 
 ## Why a proxy server?
 

@@ -13,14 +13,22 @@ export function mountFromAtcUrl(url) {
   return m ? decodeURIComponent(m[1]) : null;
 }
 
+/** `items` with those matching `isChosen` moved to the front; order otherwise kept. */
+export function chosenFirst(items, isChosen) {
+  return [...items.filter(isChosen), ...items.filter((x) => !isChosen(x))];
+}
+
 /**
  * Proxy URLs to try for an airport: the chosen feed first, then the airport's
  * other feeds as fallbacks, since individual LiveATC feeds go offline often.
  */
 export function atcSources(feeds, mount) {
-  const chosen = feeds.filter((f) => f.mount === mount);
-  const rest = feeds.filter((f) => f.mount !== mount);
-  return [...chosen, ...rest].map((f) => atcUrl(f.mount));
+  return chosenFirst(feeds, (f) => f.mount === mount).map((f) => atcUrl(f.mount));
+}
+
+/** Music stream URLs to try: the chosen station, then the others as fallbacks. */
+export function musicSources(stations, url) {
+  return chosenFirst(stations, (s) => s.url === url).map((s) => s.url);
 }
 
 // Exponential backoff for reconnects: 2s, 4s, 8s ... capped at `max`.

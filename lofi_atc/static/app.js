@@ -5,6 +5,7 @@ import {
   atcSources,
   mergeAirports,
   mountFromAtcUrl,
+  musicSources,
   nextMuteAll,
   parseFeedInput,
   shortcutFor,
@@ -43,6 +44,8 @@ const els = {
   lofiStatus: $('lofi-status'),
   atcStatus: $('atc-status'),
   feedInfo: $('feed-info'),
+  musicInfo: $('music-info'),
+  musicSelect: $('music-select'),
   feedSelect: $('feed-select'),
   removeAirport: $('remove-airport'),
   airportSelector: $('airport-selector'),
@@ -61,7 +64,8 @@ const ICON_PAUSE = '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" 
 let builtin = [];
 let custom = store.get('customAirports', []);
 let airports = [];
-let lofiSources = [];
+let music = [];
+let musicUrl = store.get('musicUrl', null);
 let selected = { icao: null, mount: null };
 let isPlaying = false;
 
@@ -78,17 +82,21 @@ function showStatus(el, state, detail, liveText) {
   el.querySelector('span').textContent = text;
 }
 
-function setInfo(text, isError = false, link = null) {
-  els.feedInfo.textContent = text;
+function setText(el, text, isError = false, link = null) {
+  el.textContent = text;
   if (link) {
     const a = document.createElement('a');
     a.href = link.href;
     a.textContent = link.text;
     a.target = '_blank';
     a.rel = 'noopener';
-    els.feedInfo.append(' ', a);
+    el.append(text ? ' ' : '', a);
   }
-  els.feedInfo.classList.toggle('error', isError);
+  el.classList.toggle('error', isError);
+}
+
+function setInfo(text, isError = false, link = null) {
+  setText(els.feedInfo, text, isError, link);
 }
 
 // Lookups can fail (LiveATC sometimes puts its search page behind a browser
@@ -117,10 +125,73 @@ function showFeedInfo(state, detail) {
   } else setInfo(base);
 }
 
+// ── Music stations ──
+function currentStation() {
+  return music.find((m) => m.url === musicUrl) ?? null;
+}
+
+function creditLink(station) {
+  return station?.credit && station.credit_url ? { href: station.credit_url, text: `via ${station.credit} ↗` } : null;
+}
+
+function showMusicInfo(state, detail) {
+  const station = currentStation();
+  if (!station) return;
+  if (state === 'connecting') setText(els.musicInfo, `${station.label} · connecting…`);
+  else if (state === 'retrying') {
+    const s = Math.round(detail.delayMs / 1000);
+    setText(els.musicInfo, `no music stations reachable, retrying in ${s}s`, true);
+  } else {
+    // The picker already shows the station name; just credit the source.
+    const link = creditLink(station);
+    setText(els.musicInfo, link ? '' : station.label, false, link);
+  }
+}
+
+function renderMusic() {
+  els.musicSelect.replaceChildren(
+    ...music.map((m) => {
+      const opt = document.createElement('option');
+      opt.value = m.url;
+      opt.textContent = m.label;
+      opt.selected = m.url === musicUrl;
+      return opt;
+    }),
+  );
+  showMusicInfo('idle');
+}
+
+function selectStation(url) {
+  if (url === musicUrl) return;
+  musicUrl = url;
+  store.set('musicUrl', musicUrl);
+  renderMusic();
+  if (isPlaying) startMusic();
+}
+
+function startMusic() {
+  lofi.start(musicSources(music, musicUrl));
+}
+
+els.musicSelect.addEventListener('change', () => selectStation(els.musicSelect.value));
+
 // ── Channels ──
 const lofi = new Channel({
   connectTimeoutMs: 15000,
-  onStatus: (s, d) => showStatus(els.lofiStatus, s, d, 'streaming'),
+  onStatus: (s, d) => {
+    showStatus(els.lofiStatus, s, d, 'streaming');
+    if (s === 'live' && d.url !== musicUrl) {
+      // The chosen station failed and a fallback is playing: say so.
+      const wanted = currentStation()?.label ?? 'station';
+      musicUrl = d.url;
+      store.set('musicUrl', musicUrl);
+      renderMusic();
+      const station = currentStation();
+      setText(els.musicInfo, `${station?.label ?? d.url} (${wanted} unavailable)`, false, creditLink(station));
+      return;
+    }
+    showMusicInfo(s, d);
+  },
 });
 const atc = new Channel({
   // ATC feeds are low bitrate, so the browser needs ~15-20s of audio before it
@@ -300,7 +371,7 @@ function togglePlay() {
   }
   isPlaying = true;
   setPlayingUi(true);
-  lofi.start(lofiSources);
+  startMusic();
   startAtc();
 }
 
@@ -365,13 +436,15 @@ async function init() {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     builtin = data.airports;
-    lofiSources = data.lofi;
+    music = data.lofi;
+    if (!music.some((m) => m.url === musicUrl)) musicUrl = music[0]?.url ?? null;
   } catch (e) {
     console.error('loading stations failed', e);
     setInfo('cannot reach the lofi-atc server; start it with `make run`', true);
     els.playBtn.disabled = true;
     return;
   }
+  renderMusic();
   renderAirports();
   const saved = store.get('selected', null);
   if (saved && airports.some((a) => a.icao === saved.icao)) selectAirport(saved.icao, saved.mount);

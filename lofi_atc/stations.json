@@ -1,8 +1,35 @@
 {
   "lofi": [
-    "https://stream.zeno.fm/0r0xa792kwzuv",
-    "https://stream.zeno.fm/f3wvbbqmdg8uv",
-    "https://streams.ilovemusic.de/iloveradio17.mp3"
+    {
+      "label": "Fluid · instrumental hip-hop",
+      "url": "https://ice1.somafm.com/fluid-128-mp3",
+      "credit": "SomaFM",
+      "credit_url": "https://somafm.com/fluid/"
+    },
+    {
+      "label": "Groove Salad · chilled downtempo",
+      "url": "https://ice2.somafm.com/groovesalad-128-mp3",
+      "credit": "SomaFM",
+      "credit_url": "https://somafm.com/groovesalad/"
+    },
+    {
+      "label": "Groove Salad 2 · more chilled downtempo",
+      "url": "https://ice1.somafm.com/groovesalad2-128-mp3",
+      "credit": "SomaFM",
+      "credit_url": "https://somafm.com/groovesalad2/"
+    },
+    {
+      "label": "Beat Blender · late-night downtempo",
+      "url": "https://ice2.somafm.com/beatblender-128-mp3",
+      "credit": "SomaFM",
+      "credit_url": "https://somafm.com/beatblender/"
+    },
+    {
+      "label": "Groove Salad Classic · early-2000s downtempo",
+      "url": "https://ice1.somafm.com/gsclassic-128-mp3",
+      "credit": "SomaFM",
+      "credit_url": "https://somafm.com/gsclassic/"
+    }
   ],
   "airports": [
     {

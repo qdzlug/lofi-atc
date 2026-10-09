@@ -7,6 +7,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 DEFAULT_STATIONS_PATH = Path(__file__).with_name("stations.json")
 
@@ -14,8 +15,30 @@ DEFAULT_STATIONS_PATH = Path(__file__).with_name("stations.json")
 MOUNT_RE = re.compile(r"^[a-z0-9_]{1,64}$")
 
 
+# Music source types the UI knows how to play. Only plain audio streams for
+# now; SoundCloud/Spotify sources will add their own types here.
+MUSIC_TYPES = ("stream",)
+
+
 class ConfigError(ValueError):
     """Raised when stations.json is missing or malformed."""
+
+
+@dataclass(frozen=True)
+class MusicStation:
+    label: str
+    url: str
+    type: str = "stream"
+    credit: str | None = None
+    credit_url: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        d = {"type": self.type, "label": self.label, "url": self.url}
+        if self.credit:
+            d["credit"] = self.credit
+        if self.credit_url:
+            d["credit_url"] = self.credit_url
+        return d
 
 
 @dataclass(frozen=True)
@@ -34,12 +57,12 @@ class Airport:
 
 @dataclass(frozen=True)
 class Stations:
-    lofi: tuple[str, ...]
+    lofi: tuple[MusicStation, ...]
     airports: tuple[Airport, ...]
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "lofi": list(self.lofi),
+            "lofi": [m.to_dict() for m in self.lofi],
             "airports": [
                 {
                     "icao": a.icao,
@@ -59,6 +82,39 @@ def _require_str(obj: dict, key: str, where: str) -> str:
     return value
 
 
+def _is_http_url(value: Any) -> bool:
+    return isinstance(value, str) and value.startswith(("https://", "http://"))
+
+
+def _parse_music(entry: Any, where: str) -> MusicStation:
+    # A bare URL is still accepted, as in older stations.json files.
+    if isinstance(entry, str):
+        if not _is_http_url(entry):
+            raise ConfigError(f"{where}: must be an http(s) URL, got {entry!r}")
+        return MusicStation(label=urlsplit(entry).hostname or entry, url=entry)
+    if not isinstance(entry, dict):
+        raise ConfigError(f"{where}: must be a URL or an object")
+    kind = entry.get("type", "stream")
+    if kind not in MUSIC_TYPES:
+        raise ConfigError(f"{where}: unknown type {kind!r} (expected one of {', '.join(MUSIC_TYPES)})")
+    url = entry.get("url")
+    if not _is_http_url(url):
+        raise ConfigError(f"{where}: 'url' must be an http(s) URL, got {url!r}")
+    credit_url = entry.get("credit_url")
+    if credit_url is not None and not _is_http_url(credit_url):
+        raise ConfigError(f"{where}: 'credit_url' must be an http(s) URL")
+    credit = entry.get("credit")
+    if credit is not None and not isinstance(credit, str):
+        raise ConfigError(f"{where}: 'credit' must be a string")
+    return MusicStation(
+        label=_require_str(entry, "label", where),
+        url=url,
+        type=kind,
+        credit=credit,
+        credit_url=credit_url,
+    )
+
+
 def parse_stations(data: Any) -> Stations:
     """Validate raw JSON data and return a Stations object."""
     if not isinstance(data, dict):
@@ -66,10 +122,10 @@ def parse_stations(data: Any) -> Stations:
 
     lofi = data.get("lofi")
     if not isinstance(lofi, list) or not lofi:
-        raise ConfigError("'lofi' must be a non-empty list of URLs")
-    for i, url in enumerate(lofi):
-        if not isinstance(url, str) or not url.startswith(("https://", "http://")):
-            raise ConfigError(f"lofi[{i}]: must be an http(s) URL, got {url!r}")
+        raise ConfigError("'lofi' must be a non-empty list of music stations")
+    music = tuple(_parse_music(entry, f"lofi[{i}]") for i, entry in enumerate(lofi))
+    if len({m.url for m in music}) != len(music):
+        raise ConfigError("'lofi' lists the same URL twice")
 
     raw_airports = data.get("airports")
     if not isinstance(raw_airports, list) or not raw_airports:
@@ -112,7 +168,7 @@ def parse_stations(data: Any) -> Stations:
             )
         )
 
-    return Stations(lofi=tuple(lofi), airports=tuple(airports))
+    return Stations(lofi=music, airports=tuple(airports))
 
 
 def load_stations(path: Path | str = DEFAULT_STATIONS_PATH) -> Stations:
