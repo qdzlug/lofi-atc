@@ -6,10 +6,12 @@ import {
   addCustomFeeds,
   atcSources,
   atcUrl,
+  chosenFirst,
   backoffDelay,
   icaoFromMount,
   mergeAirports,
   mountFromAtcUrl,
+  musicSources,
   nextMuteAll,
   parseFeedInput,
   shortcutFor,
@@ -224,6 +226,20 @@ describe('atcSources / mountFromAtcUrl', () => {
     assert.equal(mountFromAtcUrl(atcUrl('kord1n1_app_133625')), 'kord1n1_app_133625');
     assert.equal(mountFromAtcUrl('https://stream.zeno.fm/x'), null);
     assert.equal(mountFromAtcUrl(undefined), null);
+  });
+});
+
+describe('chosenFirst / musicSources', () => {
+  const stations = [{ url: 'https://a' }, { url: 'https://b' }, { url: 'https://c' }];
+  it('moves the chosen item to the front and keeps the rest in order', () => {
+    assert.deepEqual(chosenFirst([1, 2, 3, 4], (x) => x === 3), [3, 1, 2, 4]);
+  });
+  it('tries the chosen station first, then the others as fallbacks', () => {
+    assert.deepEqual(musicSources(stations, 'https://c'), ['https://c', 'https://a', 'https://b']);
+  });
+  it('uses config order when nothing (or something stale) is chosen', () => {
+    assert.deepEqual(musicSources(stations, null), ['https://a', 'https://b', 'https://c']);
+    assert.deepEqual(musicSources(stations, 'https://gone'), ['https://a', 'https://b', 'https://c']);
   });
 });
 

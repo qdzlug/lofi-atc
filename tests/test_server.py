@@ -51,7 +51,8 @@ def test_stations_api(client):
     status, _, body = client.request("/api/stations")
     assert status == 200
     data = json.loads(body)
-    assert data["lofi"]
+    assert data["lofi"][0]["type"] == "stream"
+    assert data["lofi"][0]["url"].startswith("https://")
     assert data["airports"][0]["feeds"][0]["mount"]
 
 
