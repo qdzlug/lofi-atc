@@ -217,3 +217,20 @@ def test_offline_memory_expires(make_app):
     client.request("/atc/gone")
     client.request("/atc/gone")
     assert FakeLiveATC.hits == ["gone", "gone"]
+
+
+def test_stations_api_has_no_spotify_by_default(client):
+    assert json.loads(client.request("/api/stations")[2])["spotify"] is None
+
+
+def test_stations_api_exposes_spotify_client_id(make_app):
+    app = make_app(spotify_client_id="0123456789abcdef0123456789abcdef")
+    status, _, body = Client(f"http://127.0.0.1:{app.server_address[1]}").request("/api/stations")
+    assert json.loads(body)["spotify"] == {"client_id": "0123456789abcdef0123456789abcdef"}
+
+
+def test_spotify_callback_serves_the_ui(client):
+    status, headers, body = client.request("/spotify/callback?code=abc&state=xyz")
+    assert status == 200
+    assert headers["Content-Type"].startswith("text/html")
+    assert b"lofi" in body

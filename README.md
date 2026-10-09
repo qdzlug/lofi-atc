@@ -7,6 +7,7 @@ Lofi beats mixed with live air traffic control radio. A single-page web app back
 - Lofi music and live ATC audio playing at the same time
 - **Ad-free music by default:** listener-supported [SomaFM](https://somafm.com) channels (instrumental hip-hop and downtempo), with a station picker. If a station is unreachable, the next one plays automatically
 - **SoundCloud backup:** Chillhop Music and Lofi Girl on SoundCloud, played through SoundCloud's official widget. Add any SoundCloud artist, playlist or track as a station
+- **Spotify for Premium members:** connect your Spotify account and play a playlist, album or artist right in the page (see [Spotify](#spotify))
 - Separate volume and mute controls for each channel
 - Built-in airports: **SFO**, **JFK**, **ORD**, **DEN**, **EWR**
 - **Any LiveATC airport or feed:** press **+** and enter an airport code (`KBOS`, `EGLL`), a feed name (`kbos_twr`), or paste a LiveATC link
@@ -22,7 +23,7 @@ Lofi beats mixed with live air traffic control radio. A single-page web app back
 make run
 ```
 
-This starts the server on http://localhost:7331 and opens your browser. You can also run it without `make`:
+This starts the server on http://127.0.0.1:7331 and opens your browser. You can also run it without `make`:
 
 ```
 python3 -m lofi_atc            # or: python3 lofi-atc-server.py
@@ -39,7 +40,8 @@ lofi-atc --open
 
 ```
 lofi-atc [--host HOST] [--port PORT] [--open] [--stations PATH]
-         [--min-gap SECONDS] [--max-streams N] [--log-level LEVEL]
+         [--min-gap SECONDS] [--max-streams N] [--spotify-client-id ID]
+         [--log-level LEVEL]
 ```
 
 | Option          | Default       | Description                                                               |
@@ -50,6 +52,7 @@ lofi-atc [--host HOST] [--port PORT] [--open] [--stations PATH]
 | `--stations`    | bundled       | Use your own stations JSON (see below)                                    |
 | `--min-gap`     | `1.5`         | Minimum seconds between requests to LiveATC                               |
 | `--max-streams` | `4`           | Maximum ATC streams proxied at once                                       |
+| `--spotify-client-id` | none    | Your Spotify app's client ID; enables Spotify (see below). Env: `LOFI_ATC_SPOTIFY_CLIENT_ID` |
 | `--log-level`   | `INFO`        | `DEBUG` also logs every HTTP request                                      |
 
 ## Adding airports and feeds
@@ -89,6 +92,38 @@ The lofi card plays the stations listed under `lofi` in `stations.json`. Each en
 - The selected station plays first, and the others are fallbacks in list order.
 - The defaults are ad-free SomaFM channels. SomaFM is listener-supported, so consider [donating](https://somafm.com/support/) if you use it a lot.
 
+## Spotify
+
+Spotify Premium members can play Spotify playlists, albums or artists in the lofi card. Spotify's [Web Playback SDK](https://developer.spotify.com/documentation/web-playback-sdk) turns the page into a Spotify Connect device. It needs Premium, and each self-hoster uses their own (free) Spotify developer app.
+
+**One-time setup**
+
+1. Go to the [Spotify developer dashboard](https://developer.spotify.com/dashboard), log in, and click **Create app**.
+2. Set **Redirect URI** to exactly `http://127.0.0.1:7331/spotify/callback`. Spotify doesn't accept `localhost`. If you run on another port, use that port instead.
+3. Under the APIs/SDKs used, tick **Web API** and **Web Playback SDK**, then save.
+4. Copy the app's **Client ID**. The login uses PKCE, so the app never needs the Client Secret. Don't share the secret.
+
+**Run with it**
+
+```
+LOFI_ATC_SPOTIFY_CLIENT_ID=<your client id> make run
+# or: python3 -m lofi_atc --spotify-client-id <your client id> --open
+```
+
+Open http://127.0.0.1:7331, click **connect Spotify**, and approve. The **Lofi Girl · Spotify** station is then selected; press play. To use other music, add stations to `stations.json`:
+
+```json
+{ "type": "spotify", "label": "My playlist · Spotify", "url": "https://open.spotify.com/playlist/<id>" }
+```
+
+Notes:
+
+- **Privacy:** login tokens are stored only in your browser (localStorage) and go straight to Spotify; the lofi-atc server never sees them. **disconnect Spotify** forgets them.
+- **Limits:** apps in Spotify's development mode work for the app owner plus up to 5 accounts you add under **Settings → User Management**. Spotify only grants wider access to registered businesses.
+- **Browsers:** playback needs a desktop browser with DRM enabled (Chrome, Edge, Firefox or Safari). Spotify's SDK doesn't support mobile browsers.
+- **Fallback:** if Spotify can't play (not connected, not Premium, DRM unavailable), the next station plays and the card says why.
+- **Without a client ID:** no Spotify options appear at all.
+
 ## Why a proxy server?
 
 LiveATC streams sit behind Cloudflare and expect a browser-like `Referer` and `User-Agent`, and the airport search has no API. The server fetches both on the page's behalf. It also protects you from LiveATC's rate limits:
@@ -108,7 +143,8 @@ LiveATC streams sit behind Cloudflare and expect a browser-like `Referer` and `U
   - "unreachable" means the server can't reach LiveATC. Check your network.
 - **Airport lookup finds nothing:** LiveATC may not cover that airport. You can still paste a feed name or link directly.
 - **Streams fail behind a firewall or allowlist:** `d.liveatc.net` redirects to regional relays such as `s1-bos.liveatc.net`. Allow `*.liveatc.net`. The server log shows which relay each stream came from.
-- **Health check:** `curl localhost:7331/healthz` shows the version, the number of open streams, and the feeds currently known to be offline.
+- **Spotify says "INVALID_CLIENT: Invalid redirect URI":** the redirect URI in the Spotify dashboard must match `http://127.0.0.1:<port>/spotify/callback` exactly. The server prints the expected value at startup.
+- **Health check:** `curl 127.0.0.1:7331/healthz` shows the version, the number of open streams, and the feeds currently known to be offline.
 
 ## Development
 
@@ -138,7 +174,10 @@ lofi-atc/
 │       ├── index.html
 │       ├── style.css
 │       ├── app.js        # DOM wiring
-│       └── player.js     # playback/reconnect logic and input parsing (unit tested)
+│       ├── player.js     # playback/reconnect logic and input parsing (unit tested)
+│       ├── soundcloud.js # SoundCloud widget adapter
+│       ├── spotify.js    # Spotify Web Playback SDK adapter
+│       └── spotify-auth.js # Spotify login (PKCE) and token refresh
 ├── tests/                # pytest + tests/js (node --test)
 ├── lofi-atc-server.py    # compatibility shim for the old entry point
 ├── pyproject.toml
@@ -150,7 +189,8 @@ lofi-atc/
 | Path                     | Description                                         |
 | ------------------------ | --------------------------------------------------- |
 | `/`                      | The UI                                              |
-| `/api/stations`          | Built-in airports and lofi streams (JSON)           |
+| `/api/stations`          | Built-in airports, music stations and Spotify client ID (JSON) |
+| `/spotify/callback`      | Where Spotify's login returns; serves the UI        |
 | `/api/search?icao=KBOS`  | Feeds LiveATC lists for an airport (JSON)           |
 | `/atc/<mount>`           | Proxied LiveATC audio stream                        |
 | `/healthz`               | Health/status (JSON)                                |

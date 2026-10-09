@@ -46,7 +46,19 @@ def test_round_trips_to_dict():
         (lambda d: d.update(lofi=[]), "'lofi'"),
         (lambda d: d.update(lofi=["ftp://nope"]), "lofi[0]"),
         (lambda d: d.update(lofi=[42]), "lofi[0]: must be a URL or an object"),
-        (lambda d: d["lofi"][0].update(type="spotify"), "unknown type 'spotify'"),
+        (lambda d: d["lofi"][0].update(type="youtube"), "unknown type 'youtube'"),
+        (
+            lambda d: d["lofi"][0].update(
+                type="spotify", url="https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC"
+            ),
+            "spotify 'url'",
+        ),
+        (
+            lambda d: d["lofi"][0].update(
+                type="spotify", url="https://evil.example/playlist/0vvXsWCC9xrXsKd4FyS8kM"
+            ),
+            "spotify 'url'",
+        ),
         (
             lambda d: d["lofi"][0].update(type="soundcloud", url="https://example.com/x"),
             "soundcloud 'url' must be an https://soundcloud.com/... link",
@@ -129,3 +141,18 @@ def test_bundled_stations_include_a_soundcloud_backup():
     types = [m.type for m in load_stations().lofi]
     assert types[0] == "stream"
     assert "soundcloud" in types
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://open.spotify.com/playlist/0vvXsWCC9xrXsKd4FyS8kM",
+        "https://open.spotify.com/playlist/0vvXsWCC9xrXsKd4FyS8kM?si=abc123",
+        "https://open.spotify.com/album/2noRn2Aes5aoNVsU6iWThc",
+        "https://open.spotify.com/artist/0OdUWJ0sBjDrqHygGUXeCF",
+    ],
+)
+def test_spotify_station(url):
+    data = valid()
+    data["lofi"].append({"type": "spotify", "label": "Lofi Girl", "url": url})
+    assert parse_stations(data).lofi[-1].type == "spotify"

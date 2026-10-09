@@ -94,7 +94,7 @@ def search():
 def make_app(upstream, search):
     servers = []
 
-    def make(max_streams=4):
+    def make(max_streams=4, spotify_client_id=None):
         limiter = RateLimiter(0)
         app = LofiATCServer(
             ("127.0.0.1", 0),
@@ -102,6 +102,7 @@ def make_app(upstream, search):
             limiter,
             ProxySettings(upstream_base=upstream, upstream_timeout=5, max_streams=max_streams),
             directory=FeedDirectory(limiter, fetch=search),
+            spotify_client_id=spotify_client_id,
         )
         servers.append(_serve(app))
         return app

@@ -15,9 +15,16 @@ DEFAULT_STATIONS_PATH = Path(__file__).with_name("stations.json")
 MOUNT_RE = re.compile(r"^[a-z0-9_]{1,64}$")
 
 
-# Music source types the UI knows how to play: plain audio streams, and
-# SoundCloud tracks/playlists/profiles played through SoundCloud's widget.
-MUSIC_TYPES = ("stream", "soundcloud")
+# Music source types the UI knows how to play: plain audio streams,
+# SoundCloud tracks/playlists/profiles played through SoundCloud's widget, and
+# Spotify playlists/albums/artists played with the Web Playback SDK (Premium).
+MUSIC_TYPES = ("stream", "soundcloud", "spotify")
+
+# What the Spotify player can start: a playlist, album or artist "context".
+SPOTIFY_URL_RE = re.compile(r"^https://open\.spotify\.com/(playlist|album|artist)/[A-Za-z0-9]{10,40}(\?.*)?$")
+
+# Spotify app client IDs are 32 lowercase hex characters.
+SPOTIFY_CLIENT_ID_RE = re.compile(r"^[0-9a-f]{32}$")
 
 
 class ConfigError(ValueError):
@@ -106,6 +113,10 @@ def _parse_music(entry: Any, where: str) -> MusicStation:
             host == "soundcloud.com" or host.endswith(".soundcloud.com")
         ):
             raise ConfigError(f"{where}: soundcloud 'url' must be an https://soundcloud.com/... link")
+    if kind == "spotify" and not SPOTIFY_URL_RE.match(url):
+        raise ConfigError(
+            f"{where}: spotify 'url' must be an https://open.spotify.com/playlist|album|artist/... link"
+        )
     credit_url = entry.get("credit_url")
     if credit_url is not None and not _is_http_url(credit_url):
         raise ConfigError(f"{where}: 'credit_url' must be an http(s) URL")

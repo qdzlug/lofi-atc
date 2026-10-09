@@ -58,10 +58,14 @@ class LofiATCServer(ThreadingHTTPServer):
         settings: ProxySettings | None = None,
         directory: FeedDirectory | None = None,
         static_dir: Path = STATIC_DIR,
+        spotify_client_id: str | None = None,
     ):
         self.stations = stations
         self.directory = directory or FeedDirectory(limiter)
-        self.stations_json = json.dumps(stations.to_dict()).encode()
+        # The client ID is public by design (PKCE login, no secret); the UI
+        # needs it to start the Spotify login.
+        spotify = {"client_id": spotify_client_id} if spotify_client_id else None
+        self.stations_json = json.dumps({**stations.to_dict(), "spotify": spotify}).encode()
         self.limiter = limiter
         self.settings = settings = settings or ProxySettings()
         self.static_files = {
@@ -133,7 +137,10 @@ class RequestHandler(BaseHTTPRequestHandler):
                 head,
             )
         else:
-            self._serve_static("index.html" if path == "/" else path.lstrip("/"), head)
+            # Spotify's login redirects back to /spotify/callback?code=...; the
+            # page itself finishes the login.
+            page = "index.html" if path in ("/", "/spotify/callback") else path.lstrip("/")
+            self._serve_static(page, head)
 
     # ── responses ──
 

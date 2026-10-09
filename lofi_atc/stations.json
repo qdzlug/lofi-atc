@@ -31,6 +31,13 @@
       "credit_url": "https://somafm.com/gsclassic/"
     },
     {
+      "type": "spotify",
+      "label": "Lofi Girl · Spotify (Premium)",
+      "url": "https://open.spotify.com/playlist/0vvXsWCC9xrXsKd4FyS8kM",
+      "credit": "Spotify",
+      "credit_url": "https://open.spotify.com/playlist/0vvXsWCC9xrXsKd4FyS8kM"
+    },
+    {
       "type": "soundcloud",
       "label": "Chillhop Music · SoundCloud",
       "url": "https://soundcloud.com/chillhopdotcom",

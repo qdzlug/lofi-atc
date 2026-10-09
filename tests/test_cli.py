@@ -66,3 +66,23 @@ def test_starts_serves_and_shuts_down_cleanly(entry, sig):
     finally:
         proc.kill()
         proc.stderr.close()
+
+
+def test_spotify_client_id_from_env(monkeypatch):
+    monkeypatch.setenv("LOFI_ATC_SPOTIFY_CLIENT_ID", "0123456789abcdef0123456789abcdef")
+    assert build_parser().parse_args([]).spotify_client_id == "0123456789abcdef0123456789abcdef"
+
+
+@pytest.mark.parametrize("bad", ["nope", "0123456789abcdef", "zz23456789abcdef0123456789abcdef"])
+def test_invalid_spotify_client_id_exits_2(bad):
+    assert main(["--port", "0", "--spotify-client-id", bad]) == 2
+
+
+def test_banner_uses_127_0_0_1_for_spotify():
+    proc, url = start("-m", "lofi_atc")
+    try:
+        assert url.startswith("http://127.0.0.1:")
+    finally:
+        proc.kill()
+        proc.wait()
+        proc.stderr.close()
