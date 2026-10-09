@@ -6,6 +6,7 @@ Lofi beats mixed with live air traffic control radio. A single-page web app back
 
 - Lofi music and live ATC audio playing at the same time
 - **Ad-free music by default:** listener-supported [SomaFM](https://somafm.com) channels (instrumental hip-hop and downtempo), with a station picker. If a station is unreachable, the next one plays automatically
+- **SoundCloud backup:** Chillhop Music and Lofi Girl on SoundCloud, played through SoundCloud's official widget. Add any SoundCloud artist, playlist or track as a station
 - Separate volume and mute controls for each channel
 - Built-in airports: **SFO**, **JFK**, **ORD**, **DEN**, **EWR**
 - **Any LiveATC airport or feed:** press **+** and enter an airport code (`KBOS`, `EGLL`), a feed name (`kbos_twr`), or paste a LiveATC link
@@ -77,6 +78,13 @@ The lofi card plays the stations listed under `lofi` in `stations.json`. Each en
 ```
 
 - `url` must be a direct audio stream (MP3/AAC) that a browser can play. Plain URL strings are still accepted, as in older config files.
+- To use SoundCloud, add `"type": "soundcloud"` and set `url` to any `https://soundcloud.com/...` artist, playlist or track page:
+
+  ```json
+  { "type": "soundcloud", "label": "Chillhop Music · SoundCloud", "url": "https://soundcloud.com/chillhopdotcom" }
+  ```
+
+  It plays through SoundCloud's embed widget, which appears in the lofi card while that station is playing. That shows the track and gives SoundCloud the attribution it expects. Playback starts at a random track and loops at the end of the list. Volume and mute are controlled by the app as usual. SoundCloud may occasionally play its own ads or previews in the widget; that's out of this app's control.
 - `credit` and `credit_url` are optional. When set, the UI links back to the source.
 - The selected station plays first, and the others are fallbacks in list order.
 - The defaults are ad-free SomaFM channels. SomaFM is listener-supported, so consider [donating](https://somafm.com/support/) if you use it a lot.

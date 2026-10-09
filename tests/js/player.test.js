@@ -235,11 +235,11 @@ describe('chosenFirst / musicSources', () => {
     assert.deepEqual(chosenFirst([1, 2, 3, 4], (x) => x === 3), [3, 1, 2, 4]);
   });
   it('tries the chosen station first, then the others as fallbacks', () => {
-    assert.deepEqual(musicSources(stations, 'https://c'), ['https://c', 'https://a', 'https://b']);
+    assert.deepEqual(musicSources(stations, 'https://c').map((s) => s.url), ['https://c', 'https://a', 'https://b']);
   });
   it('uses config order when nothing (or something stale) is chosen', () => {
-    assert.deepEqual(musicSources(stations, null), ['https://a', 'https://b', 'https://c']);
-    assert.deepEqual(musicSources(stations, 'https://gone'), ['https://a', 'https://b', 'https://c']);
+    assert.deepEqual(musicSources(stations, null).map((s) => s.url), ['https://a', 'https://b', 'https://c']);
+    assert.deepEqual(musicSources(stations, 'https://gone').map((s) => s.url), ['https://a', 'https://b', 'https://c']);
   });
 });
 
@@ -333,5 +333,23 @@ describe('shortcutFor', () => {
     assert.equal(shortcutFor('Space', { tagName: 'BUTTON' }), null);
     assert.equal(shortcutFor('ArrowUp', { tagName: 'INPUT', type: 'range' }), null);
     assert.equal(shortcutFor('KeyM', { tagName: 'INPUT', type: 'range' }), 'mute');
+  });
+});
+
+describe('Channel source objects', () => {
+  it('passes the source to createAudio and reports it when live', async () => {
+    FakeAudio.behaviour = { 'https://a': 'ok' };
+    const seen = [];
+    let live;
+    const ch = new Channel({
+      createAudio: (src) => { seen.push(src); return new FakeAudio(); },
+      timers: new FakeTimers(),
+      onStatus: (s, d) => { if (s === 'live') live = d; },
+    });
+    const station = { type: 'stream', label: 'A', url: 'https://a' };
+    assert.equal(await ch.start([station]), true);
+    assert.deepEqual(seen, [station]);
+    assert.equal(ch.audio.src, 'https://a');
+    assert.deepEqual(live, { url: 'https://a', source: station });
   });
 });

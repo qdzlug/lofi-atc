@@ -29,6 +29,20 @@
       "url": "https://ice1.somafm.com/gsclassic-128-mp3",
       "credit": "SomaFM",
       "credit_url": "https://somafm.com/gsclassic/"
+    },
+    {
+      "type": "soundcloud",
+      "label": "Chillhop Music · SoundCloud",
+      "url": "https://soundcloud.com/chillhopdotcom",
+      "credit": "Chillhop Music on SoundCloud",
+      "credit_url": "https://soundcloud.com/chillhopdotcom"
+    },
+    {
+      "type": "soundcloud",
+      "label": "Lofi Girl · SoundCloud",
+      "url": "https://soundcloud.com/lofi_girl",
+      "credit": "Lofi Girl on SoundCloud",
+      "credit_url": "https://soundcloud.com/lofi_girl"
     }
   ],
   "airports": [

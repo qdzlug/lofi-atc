@@ -47,6 +47,18 @@ def test_round_trips_to_dict():
         (lambda d: d.update(lofi=["ftp://nope"]), "lofi[0]"),
         (lambda d: d.update(lofi=[42]), "lofi[0]: must be a URL or an object"),
         (lambda d: d["lofi"][0].update(type="spotify"), "unknown type 'spotify'"),
+        (
+            lambda d: d["lofi"][0].update(type="soundcloud", url="https://example.com/x"),
+            "soundcloud 'url' must be an https://soundcloud.com/... link",
+        ),
+        (
+            lambda d: d["lofi"][0].update(type="soundcloud", url="https://soundcloud.com.evil.example/x"),
+            "soundcloud 'url'",
+        ),
+        (
+            lambda d: d["lofi"][0].update(type="soundcloud", url="http://soundcloud.com/x"),
+            "soundcloud 'url'",
+        ),
         (lambda d: d["lofi"][0].update(url="nope"), "'url'"),
         (lambda d: d["lofi"][0].pop("label"), "'label'"),
         (lambda d: d["lofi"][0].update(credit_url="javascript:alert(1)"), "'credit_url'"),
@@ -102,3 +114,18 @@ def test_bare_url_lofi_entries_still_work():
         "label": "radio.example.com",
         "url": "https://radio.example.com/lofi.mp3",
     }
+
+
+def test_soundcloud_station():
+    data = valid()
+    data["lofi"].append(
+        {"type": "soundcloud", "label": "Chillhop", "url": "https://soundcloud.com/chillhopdotcom"}
+    )
+    station = parse_stations(data).lofi[-1]
+    assert (station.type, station.url) == ("soundcloud", "https://soundcloud.com/chillhopdotcom")
+
+
+def test_bundled_stations_include_a_soundcloud_backup():
+    types = [m.type for m in load_stations().lofi]
+    assert types[0] == "stream"
+    assert "soundcloud" in types

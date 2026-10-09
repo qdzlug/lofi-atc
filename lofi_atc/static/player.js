@@ -26,9 +26,14 @@ export function atcSources(feeds, mount) {
   return chosenFirst(feeds, (f) => f.mount === mount).map((f) => atcUrl(f.mount));
 }
 
-/** Music stream URLs to try: the chosen station, then the others as fallbacks. */
+/** Music stations to try: the chosen one, then the others as fallbacks. */
 export function musicSources(stations, url) {
-  return chosenFirst(stations, (s) => s.url === url).map((s) => s.url);
+  return chosenFirst(stations, (s) => s.url === url);
+}
+
+/** A Channel source is a URL string or an object with a `url` (and maybe a `type`). */
+export function sourceUrl(source) {
+  return typeof source === 'string' ? source : source.url;
 }
 
 // Exponential backoff for reconnects: 2s, 4s, 8s ... capped at `max`.
@@ -149,6 +154,8 @@ export function shortcutFor(code, target = {}) {
  */
 export class Channel {
   constructor({
+    // Called with the source being opened, so a channel can mix element types
+    // (e.g. <audio> for streams, a SoundCloud widget adapter for SoundCloud).
     createAudio = () => new Audio(),
     timers = globalThis,
     connectTimeoutMs = 12000,
@@ -203,11 +210,12 @@ export class Channel {
     this._teardown();
     this.onStatus('connecting');
 
-    for (const url of this.sources) {
+    for (const source of this.sources) {
+      const url = sourceUrl(source);
       if (gen !== this.generation) return false;
       let audio;
       try {
-        audio = await this._open(url);
+        audio = await this._open(source);
         if (gen !== this.generation) { discard(audio); return false; }
         await audio.play();
         if (gen !== this.generation) { discard(audio); return false; }
@@ -218,7 +226,7 @@ export class Channel {
       this.audio = audio;
       this.attempt = 0;
       this._watch(audio, gen);
-      this.onStatus('live', { url });
+      this.onStatus('live', { url, source });
       return true;
     }
 
@@ -227,9 +235,9 @@ export class Channel {
     return false;
   }
 
-  _open(url) {
+  _open(source) {
     return new Promise((resolve, reject) => {
-      const audio = this.createAudio();
+      const audio = this.createAudio(source);
       audio.volume = this.effectiveVolume;
       const timer = this.timers.setTimeout(() => {
         discard(audio);
@@ -241,7 +249,7 @@ export class Channel {
         discard(audio);
         reject(audio.error || new Error('audio error'));
       }, { once: true });
-      audio.src = url;
+      audio.src = sourceUrl(source);
       audio.load();
     });
   }
