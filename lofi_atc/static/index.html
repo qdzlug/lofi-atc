@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>lofi + atc</title>
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="/style.css">
 </head>
 <body>
 
@@ -38,6 +38,10 @@
     </div>
     <div class="feed-info" id="music-info" aria-live="polite"></div>
     <div class="soundcloud-host" id="soundcloud-host" hidden></div>
+    <div class="spotify-row" id="spotify-row" hidden>
+      <button type="button" class="airport-btn" id="spotify-connect">connect Spotify</button>
+      <span class="feed-info" id="spotify-info" aria-live="polite"></span>
+    </div>
   </div>
 
   <!-- ATC Card -->
@@ -92,6 +96,6 @@
   </div>
 </div>
 
-<script type="module" src="app.js"></script>
+<script type="module" src="/app.js"></script>
 </body>
 </html>

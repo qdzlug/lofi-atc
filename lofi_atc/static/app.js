@@ -11,6 +11,8 @@ import {
   shortcutFor,
 } from './player.js';
 import { SoundCloudAudio } from './soundcloud.js';
+import { SpotifyAudio, loadSpotifySdk } from './spotify.js';
+import { SpotifyAuth } from './spotify-auth.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -31,6 +33,13 @@ const store = {
       // not persisted; fine
     }
   },
+  remove(key) {
+    try {
+      localStorage.removeItem(`lofi-atc:${key}`);
+    } catch {
+      // nothing to remove
+    }
+  },
 };
 
 const els = {
@@ -48,6 +57,9 @@ const els = {
   musicInfo: $('music-info'),
   musicSelect: $('music-select'),
   soundcloudHost: $('soundcloud-host'),
+  spotifyRow: $('spotify-row'),
+  spotifyConnect: $('spotify-connect'),
+  spotifyInfo: $('spotify-info'),
   feedSelect: $('feed-select'),
   removeAirport: $('remove-airport'),
   airportSelector: $('airport-selector'),
@@ -139,7 +151,9 @@ function creditLink(station) {
 function showMusicInfo(state, detail) {
   const station = currentStation();
   if (!station) return;
-  if (state === 'connecting') setText(els.musicInfo, `${station.label} · connecting…`);
+  if (state === 'live' && station.type === 'spotify' && nowPlaying) {
+    setText(els.musicInfo, `♪ ${nowPlaying.name} · ${nowPlaying.artists}`, false, creditLink(station));
+  } else if (state === 'connecting') setText(els.musicInfo, `${station.label} · connecting…`);
   else if (state === 'retrying') {
     const s = Math.round(detail.delayMs / 1000);
     setText(els.musicInfo, `no music stations reachable, retrying in ${s}s`, true);
@@ -155,7 +169,7 @@ function renderMusic() {
     ...music.map((m) => {
       const opt = document.createElement('option');
       opt.value = m.url;
-      opt.textContent = m.label;
+      opt.textContent = m.type === 'spotify' && !spotifyAuth?.connected ? `${m.label} (connect Spotify first)` : m.label;
       opt.selected = m.url === musicUrl;
       return opt;
     }),
@@ -165,6 +179,7 @@ function renderMusic() {
 
 function selectStation(url) {
   if (url === musicUrl) return;
+  nowPlaying = null;
   musicUrl = url;
   store.set('musicUrl', musicUrl);
   renderMusic();
@@ -172,7 +187,31 @@ function selectStation(url) {
 }
 
 function startMusic() {
-  lofi.start(musicSources(music, musicUrl));
+  nowPlaying = null;
+  // Spotify stations are only worth trying as fallbacks once connected.
+  const usable = (s) => s.type !== 'spotify' || spotifyAuth?.connected || s.url === musicUrl;
+  lofi.start(musicSources(music, musicUrl).filter(usable));
+}
+
+// Why the last station failed, so a fallback can say more than "unavailable".
+let lastMusicError = null;
+
+function createMusicAudio(station) {
+  let audio;
+  if (station.type === 'soundcloud') audio = new SoundCloudAudio({ host: els.soundcloudHost });
+  else if (station.type === 'spotify') {
+    audio = new SpotifyAudio({
+      auth: spotifyAuth ?? { connected: false },
+      onTrack: (track) => {
+        nowPlaying = track;
+        if (currentStation()?.url === station.url) showMusicInfo('live');
+      },
+    });
+  } else audio = new Audio();
+  audio.addEventListener('error', () => {
+    lastMusicError = { url: station.url, message: audio.error?.message };
+  });
+  return audio;
 }
 
 els.musicSelect.addEventListener('change', () => selectStation(els.musicSelect.value));
@@ -180,18 +219,19 @@ els.musicSelect.addEventListener('change', () => selectStation(els.musicSelect.v
 // ── Channels ──
 const lofi = new Channel({
   connectTimeoutMs: 15000,
-  createAudio: (station) =>
-    station.type === 'soundcloud' ? new SoundCloudAudio({ host: els.soundcloudHost }) : new Audio(),
+  createAudio: createMusicAudio,
   onStatus: (s, d) => {
     showStatus(els.lofiStatus, s, d, 'streaming');
     if (s === 'live' && d.url !== musicUrl) {
-      // The chosen station failed and a fallback is playing: say so.
-      const wanted = currentStation()?.label ?? 'station';
+      // The chosen station failed and a fallback is playing: say why.
+      const wanted = currentStation();
+      const reason = lastMusicError?.url === wanted?.url && lastMusicError.message;
       musicUrl = d.url;
       store.set('musicUrl', musicUrl);
       renderMusic();
       const station = currentStation();
-      setText(els.musicInfo, `${station?.label ?? d.url} (${wanted} unavailable)`, false, creditLink(station));
+      const why = reason ? `${wanted.label}: ${reason}` : `${wanted?.label ?? 'station'} unavailable`;
+      setText(els.musicInfo, `${station?.label ?? d.url} (${why})`, false, creditLink(station));
       return;
     }
     showMusicInfo(s, d);
@@ -433,21 +473,99 @@ for (let i = 0; i < 32; i++) {
   els.viz.appendChild(bar);
 }
 
+// ── Spotify ──
+let spotifyAuth = null;
+let nowPlaying = null;
+
+// Spotify only accepts loopback redirect URIs written as 127.0.0.1, and the
+// login must finish on the origin that started it (it keeps the PKCE verifier
+// in that origin's storage).
+const SPOTIFY_HOST = '127.0.0.1';
+
+function renderSpotify(message = '', isError = false) {
+  els.spotifyRow.hidden = !spotifyAuth;
+  if (!spotifyAuth) return;
+  els.spotifyConnect.textContent = spotifyAuth.connected ? 'disconnect Spotify' : 'connect Spotify';
+  setText(els.spotifyInfo, message || (spotifyAuth.connected ? 'Spotify connected' : 'Premium needed'), isError);
+}
+
+async function startSpotifyLogin() {
+  if (location.hostname !== SPOTIFY_HOST) {
+    location.href = `http://${SPOTIFY_HOST}:${location.port}/?spotify=connect`;
+    return;
+  }
+  location.href = await spotifyAuth.loginUrl();
+}
+
+els.spotifyConnect.addEventListener('click', () => {
+  if (!spotifyAuth) return;
+  if (!spotifyAuth.connected) {
+    startSpotifyLogin().catch((e) => renderSpotify(e.message, true));
+    return;
+  }
+  spotifyAuth.disconnect();
+  renderSpotify('Spotify disconnected');
+  renderMusic();
+  if (isPlaying && currentStation()?.type === 'spotify') startMusic(); // falls back to the next station
+});
+
+async function initSpotify(config) {
+  if (!config?.client_id) {
+    // Without a client ID there's no way to log in, so hide Spotify stations.
+    music = music.filter((m) => m.type !== 'spotify');
+    return;
+  }
+  spotifyAuth = new SpotifyAuth({
+    clientId: config.client_id,
+    redirectUri: `http://${SPOTIFY_HOST}:${location.port}/spotify/callback`,
+    storage: store,
+  });
+  const params = new URLSearchParams(location.search);
+  let message = '';
+  let isError = false;
+  if (location.pathname === '/spotify/callback') {
+    try {
+      if (await spotifyAuth.handleCallback(params)) {
+        message = 'Spotify connected; press play';
+        const first = music.find((m) => m.type === 'spotify');
+        if (first) {
+          musicUrl = first.url;
+          store.set('musicUrl', musicUrl);
+        }
+      }
+    } catch (e) {
+      message = e.message;
+      isError = true;
+    }
+    history.replaceState(null, '', '/');
+  } else if (params.get('spotify') === 'connect') {
+    history.replaceState(null, '', '/');
+    startSpotifyLogin().catch((e) => renderSpotify(e.message, true));
+  }
+  if (spotifyAuth.connected) {
+    // Load the SDK up front so the player is created inside the play click.
+    loadSpotifySdk().catch(() => {});
+  }
+  renderSpotify(message, isError);
+}
+
 // ── Boot ──
 async function init() {
+  let data;
   try {
     const res = await fetch('/api/stations');
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
+    data = await res.json();
     builtin = data.airports;
     music = data.lofi;
-    if (!music.some((m) => m.url === musicUrl)) musicUrl = music[0]?.url ?? null;
   } catch (e) {
     console.error('loading stations failed', e);
     setInfo('cannot reach the lofi-atc server; start it with `make run`', true);
     els.playBtn.disabled = true;
     return;
   }
+  await initSpotify(data.spotify);
+  if (!music.some((m) => m.url === musicUrl)) musicUrl = music[0]?.url ?? null;
   renderMusic();
   renderAirports();
   const saved = store.get('selected', null);

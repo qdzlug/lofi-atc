@@ -10,7 +10,7 @@ import sys
 import webbrowser
 
 from . import __version__
-from .config import DEFAULT_STATIONS_PATH, ConfigError, load_stations
+from .config import DEFAULT_STATIONS_PATH, SPOTIFY_CLIENT_ID_RE, ConfigError, load_stations
 from .ratelimit import RateLimiter
 from .server import LofiATCServer, ProxySettings
 
@@ -54,6 +54,13 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="N",
         help="maximum concurrent proxied ATC streams (default: 4)",
     )
+    p.add_argument(
+        "--spotify-client-id",
+        default=os.environ.get("LOFI_ATC_SPOTIFY_CLIENT_ID"),
+        metavar="ID",
+        help="Client ID of your Spotify developer app; enables Spotify stations (Premium) "
+        "[env: LOFI_ATC_SPOTIFY_CLIENT_ID]",
+    )
     p.add_argument("--upstream", default=ProxySettings.upstream_base, help=argparse.SUPPRESS)
     p.add_argument(
         "--log-level",
@@ -83,17 +90,32 @@ def main(argv: list[str] | None = None) -> int:
         log.error("invalid station config: %s", e)
         return 2
 
+    client_id = (args.spotify_client_id or "").strip().lower() or None
+    if client_id and not SPOTIFY_CLIENT_ID_RE.match(client_id):
+        log.error("invalid Spotify client ID %r: expected 32 hex characters", args.spotify_client_id)
+        return 2
+
     settings = ProxySettings(upstream_base=args.upstream, max_streams=args.max_streams)
     try:
-        server = LofiATCServer((args.host, args.port), stations, RateLimiter(args.min_gap), settings)
+        server = LofiATCServer(
+            (args.host, args.port),
+            stations,
+            RateLimiter(args.min_gap),
+            settings,
+            spotify_client_id=client_id,
+        )
     except OSError as e:
         log.error("cannot listen on %s:%d: %s", args.host, args.port, e)
         return 1
 
     port = server.server_address[1]
-    display_host = "localhost" if args.host in ("0.0.0.0", "127.0.0.1", "::") else args.host
+    # 127.0.0.1 rather than localhost: Spotify only accepts loopback redirect
+    # URIs written as an IP, and the login must start from the same origin.
+    display_host = "127.0.0.1" if args.host in ("0.0.0.0", "127.0.0.1", "::", "localhost") else args.host
     url = f"http://{display_host}:{port}"
     log.info("lofi + atc %s listening on %s (Ctrl+C to stop)", __version__, url)
+    if client_id:
+        log.info("Spotify enabled; its redirect URI must be %s/spotify/callback", url)
     if args.open:
         webbrowser.open(url)
 
