@@ -15,9 +15,9 @@ DEFAULT_STATIONS_PATH = Path(__file__).with_name("stations.json")
 MOUNT_RE = re.compile(r"^[a-z0-9_]{1,64}$")
 
 
-# Music source types the UI knows how to play. Only plain audio streams for
-# now; SoundCloud/Spotify sources will add their own types here.
-MUSIC_TYPES = ("stream",)
+# Music source types the UI knows how to play: plain audio streams, and
+# SoundCloud tracks/playlists/profiles played through SoundCloud's widget.
+MUSIC_TYPES = ("stream", "soundcloud")
 
 
 class ConfigError(ValueError):
@@ -100,6 +100,12 @@ def _parse_music(entry: Any, where: str) -> MusicStation:
     url = entry.get("url")
     if not _is_http_url(url):
         raise ConfigError(f"{where}: 'url' must be an http(s) URL, got {url!r}")
+    if kind == "soundcloud":
+        host = (urlsplit(url).hostname or "").lower()
+        if not url.startswith("https://") or not (
+            host == "soundcloud.com" or host.endswith(".soundcloud.com")
+        ):
+            raise ConfigError(f"{where}: soundcloud 'url' must be an https://soundcloud.com/... link")
     credit_url = entry.get("credit_url")
     if credit_url is not None and not _is_http_url(credit_url):
         raise ConfigError(f"{where}: 'credit_url' must be an http(s) URL")

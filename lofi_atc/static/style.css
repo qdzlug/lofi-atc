@@ -371,3 +371,14 @@ input[type="range"]::-webkit-slider-thumb:hover {
 .add-form[hidden] { display: none; }
 .feed-info.error { color: var(--red); }
 .feed-info a { color: var(--accent); }
+
+/* SoundCloud stations play through SoundCloud's own (visible) widget */
+.soundcloud-host { margin-top: 12px; }
+.soundcloud-host[hidden] { display: none; }
+.soundcloud-widget {
+  display: block;
+  width: 100%;
+  height: 166px;
+  border: 0;
+  border-radius: 8px;
+}

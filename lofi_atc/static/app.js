@@ -10,6 +10,7 @@ import {
   parseFeedInput,
   shortcutFor,
 } from './player.js';
+import { SoundCloudAudio } from './soundcloud.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -46,6 +47,7 @@ const els = {
   feedInfo: $('feed-info'),
   musicInfo: $('music-info'),
   musicSelect: $('music-select'),
+  soundcloudHost: $('soundcloud-host'),
   feedSelect: $('feed-select'),
   removeAirport: $('remove-airport'),
   airportSelector: $('airport-selector'),
@@ -178,6 +180,8 @@ els.musicSelect.addEventListener('change', () => selectStation(els.musicSelect.v
 // ── Channels ──
 const lofi = new Channel({
   connectTimeoutMs: 15000,
+  createAudio: (station) =>
+    station.type === 'soundcloud' ? new SoundCloudAudio({ host: els.soundcloudHost }) : new Audio(),
   onStatus: (s, d) => {
     showStatus(els.lofiStatus, s, d, 'streaming');
     if (s === 'live' && d.url !== musicUrl) {
